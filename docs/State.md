@@ -1,0 +1,22 @@
+# ModumMoDsenseApi.State
+
+## Enum
+
+
+* `IN_TRANSIT` (value: `"IN_TRANSIT"`)
+
+* `EXAMINATION_REQUIRED` (value: `"EXAMINATION_REQUIRED"`)
+
+* `COMPLIANT` (value: `"COMPLIANT"`)
+
+* `NON_COMPLIANT` (value: `"NON_COMPLIANT"`)
+
+* `ERRONEOUS` (value: `"ERRONEOUS"`)
+
+* `ERRONEOUS_ACKNOWLEDGED` (value: `"ERRONEOUS_ACKNOWLEDGED"`)
+
+* `MISSING_DATA` (value: `"MISSING_DATA"`)
+
+* `MISSING_DATA_ACKNOWLEDGED` (value: `"MISSING_DATA_ACKNOWLEDGED"`)
+
+

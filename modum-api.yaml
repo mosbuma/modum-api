@@ -1,0 +1,2831 @@
+openapi: 3.0.3
+info:
+  title: Modum MODsense API
+  description: Allows you to interact with the modum system
+  contact:
+    name: Modum Support
+    url: https://support.modum.io/
+    email: support@modum.io
+  version: 4.3.2
+  x-logo:
+    url: logo.svg
+    backgroundColor: "#FFFFFF"
+    altText: modum.io AG
+servers:
+  - url: https://api.trial.modum.io/
+    description: Trial environment
+  - url: https://api.modum.io/
+    description: Production environment
+paths:
+  /auth/activate:
+    post:
+      tags:
+        - Account
+      summary: Activate new user account
+      description: Activating an account after an invitation email was received
+      operationId: ActivateAccount
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivateAccountRequest"
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /auth/reset:
+    put:
+      tags:
+        - Account
+      summary: Initialize password reset
+      description: Request password reset email
+      operationId: InitializeReset
+      parameters: []
+      requestBody:
+        description: Email of the user who wants to reset their password
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InitializeResetRequest"
+            example:
+              email: max.muster@example.com
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "429":
+          description: rate limit reached
+    post:
+      tags:
+        - Account
+      summary: Reset password
+      description: Set a new password
+      operationId: ResetPassword
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+            example:
+              reset_token: "{{resetToken}}"
+              password: Asdf112.!
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+  /auth/login:
+    post:
+      tags:
+        - Account
+      summary: Log in
+      operationId: Login
+      description: Log in - get the user information, a JWT token, and a refresh token for the user.
+      parameters: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              required:
+                - email
+                - password
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+        required: true
+      responses:
+        "200":
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Auth"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: User has no account in this environment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: number
+                    enum:
+                      - 403
+                  message:
+                    type: string
+                    enum:
+                      - Forbidden
+                  error:
+                    type: string
+                    enum:
+                      - no_account_in_environment
+  /auth/refresh:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Account
+      summary: Refresh authentication token
+      operationId: Refresh
+      description: Refresh authentication token
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: User has no account in this environment
+  /user:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      summary: Get own user
+      operationId: GetOwnUser
+      description: Get the logged in user information including company, role and permissions.
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  created_at:
+                    type: string
+                    format: date-time
+                  first_name:
+                    type: string
+                  last_name:
+                    type: string
+                  email:
+                    type: string
+                    format: email
+                  is_activated:
+                    type: boolean
+                  language:
+                    $ref: "#/components/schemas/Language"
+                  pin_is_set:
+                    type: boolean
+                  companies:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        feature_pin_verification:
+                          type: boolean
+                        feature_web_ble:
+                          type: boolean
+                        feature_custom_fields:
+                          type: boolean
+                        feature_gateways:
+                          type: boolean
+                        role_id:
+                          type: string
+                          format: uuid
+                        role_name:
+                          type: string
+                        permissions:
+                          type: array
+                          items:
+                            $ref: "#/components/schemas/Permission"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                status: 403
+                message: Forbidden
+                error: no account in environment
+  /users:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      summary: Invite user
+      operationId: InviteUser
+      description: Invite a new user to join your modum organization. Only a company admin is allowed to invite new users.
+      parameters: []
+      requestBody:
+        description: New user information
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteUserRequest"
+            example:
+              email: new.user@example.com
+              first_name: Max
+              last_name: Muster
+              role_id: "{{roleId}}"
+        required: true
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  first_name:
+                    type: string
+                  last_name:
+                    type: string
+                  is_activated:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      summary: Update own user account
+      operationId: UpdateOwnUser
+      description: Update own user account details, such as language, phone number, or name.
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateownUserRequest"
+            example:
+              first_name: Beni
+              last_name: Whales
+              phone: 417741642222
+              language: de
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      summary: List users
+      operationId: ListUsers
+      description: Get a list of users in the company of the authenticated user.
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/users/{userId}":
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      summary: Change role of user
+      operationId: ChangeRoleOfUser
+      description: Update the role of users in the company. Only a company admin is allowed to update other users. There needs to be at least one Admin per company, so changing the role of the last Admin won't work.
+      parameters:
+        - name: userId
+          in: path
+          description: The id of the user for which we want to change the role.
+          required: true
+          style: simple
+          schema:
+            type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRoleOfUserRequest"
+            example:
+              role_id: 16ebd89f-c980-4722-bda2-c20139b0e887
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "400":
+          description: Can't take 'Admin' role away from user, because that would leave no admin user in this company.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: number
+                    enum:
+                      - 400
+                  message:
+                    type: string
+                    enum:
+                      - Invalid request
+                  error:
+                    type: string
+                    enum:
+                      - one_admin_required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: User or role not found. This could also mean that the role or user lives in another company.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: number
+                    enum:
+                      - 404
+                  message:
+                    type: string
+                    enum:
+                      - Not found
+                  error:
+                    type: string
+                    enum:
+                      - user_not_found
+                      - role_not_found
+              examples:
+                UserNotFound:
+                  value:
+                    status: 404
+                    message: Not found
+                    error: user_not_found
+                RoleNotFound:
+                  value:
+                    status: 404
+                    message: Not found
+                    error: role_not_found
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      summary: Deactivate user account
+      operationId: RemoveUser
+      description: Remove a user in your company. The user will no longer be allowed to access this company. This action is only possible if the given user is not the last company admin. Only a company admin is allowed to remove users.
+      parameters:
+        - name: userId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/users/{userId}/reactivate":
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      summary: Reactivate a user
+      operationId: ReactivateUser
+      description: Reactivate user account in your company that was previously deactivated. Only company admins can reactivate user accounts.
+      parameters:
+        - name: userId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            example: application/json
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /users/verification:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      summary: Request Verification PIN Change
+      operationId: RequestPinChange
+      description: Sends an email to change the verification pin
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - User
+      summary: Set Verification PIN
+      operationId: SetVerificationPin
+      description: Set the verification pin to a new value
+      requestBody:
+        content:
+          application/json:
+            schema:
+              required:
+                - pin
+                - token
+              type: object
+              properties:
+                pin:
+                  type: string
+                token:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /roles:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Role
+      summary: Create role
+      operationId: CreateRole,
+      description: Create a new role with no permissions. Permissions can be added separately. Only company admins are allowed to create new roles.
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Role"
+            example:
+              name: Admin
+        required: true
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Role
+      summary: List existing roles
+      operationId: ListRoles
+      description: List all roles in your company.
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            example: application/json
+      responses:
+        "200":
+          description: Succesful
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/roles/{roleId}":
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - Role
+      summary: Delete role
+      operationId: DeleteRole
+      description: Delete a role in your company. This action is irreversible. Only company admins are allowed to delete roles.
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            example: application/json
+        - name: roleId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - Role
+      summary: Add permissions to a role
+      operationId: UpdateRole
+      description: Add permissions to an existing role. Only company admins are allowed to update roles.
+      parameters:
+        - name: roleId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - permissions
+              properties:
+                permissions:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/Permission"
+            example:
+              permissions:
+                - LIST_SHIPMENTS
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /profiles:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Create a shipment profile
+      operationId: CreateProfile
+      description: Create a new shipment profile. Shipment profile contains settings used when starting loggers, such as the recording interval, as well as the alarm criteria.
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Profile"
+            example:
+              name: Ambient
+              recording_interval: 60
+              recording_delay: 0
+              expected_shipment_duration: 14400
+              minimum_temperature: 1500
+              maximum_temperature: 2500
+              absolute_minimum_temperature: 1000
+              absolute_maximum_temperature: 2600
+              deviation_permissible_duration: 60
+              deviation_reset_time: 60
+              average_last_n_temperatures: 0
+              show_alert_on_logger: true
+              show_alert_on_mobile: true
+        required: true
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Get shipment profiles
+      operationId: GetProfiles
+      description: Get the list of shipment profiles. This endpoint returns the newest version of all profiles, including the deactivated ones.
+      parameters: []
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/profiles/{group_id}":
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Delete a shipment profile
+      operationId: Delete profile
+      description: Soft delete / deactivate a shipment profile. The profile is still accessible in the list of profiles.
+      parameters:
+        - name: group_id
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                properties:
+                  deleted_at:
+                    type: string
+                    format: date-time
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Create new version of shipment profile
+      operationId: Update profile
+      description: Deactives the previous shipment profile and adds a new version with sent parameters.
+      parameters:
+        - name: group_id
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Profile"
+            example:
+              name: Ambient
+              recording_interval: 60
+              recording_delay: 0
+              expected_shipment_duration: 14400
+              minimum_temperature: 1500
+              maximum_temperature: 2500
+              absolute_minimum_temperature: 1000
+              absolute_maximum_temperature: 2600
+              deviation_permissible_duration: 60
+              deviation_reset_time: 60
+              average_last_n_temperatures: 0
+              show_alert_on_logger: true
+              show_alert_on_mobile: true
+        required: true
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /shipments/overview:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Get a shipment overview
+      operationId: GetShipmentsOverview
+      description: Get an overview of the number of shipments in each of the possible states.
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            example: application/json
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                properties:
+                  compliant:
+                    type: integer
+                    format: uint64
+                  erroneous:
+                    type: integer
+                    format: uint64
+                  erroneous_acknowledged:
+                    type: integer
+                    format: uint64
+                  examination_required:
+                    type: integer
+                    format: uint64
+                  in_transit:
+                    type: integer
+                    format: uint64
+                  missing_data:
+                    type: integer
+                    format: uint64
+                  missing_data_acknowledged:
+                    type: integer
+                    format: uint64
+                  non_compliant:
+                    type: integer
+                    format: uint64
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /shipments/status:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Get status of shipments
+      operationId: GetShipmentStatus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required:
+                  - nonce_prefix
+                  - mac_address
+                properties:
+                  nonce_prefix:
+                    type: string
+                  mac_address:
+                    type: string
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    nonce_prefix:
+                      type: string
+                    mac_address:
+                      type: string
+                    next_index:
+                      type: integer
+                    next_timestamp:
+                      type: string
+                      format: date-time
+                    status:
+                      type: string
+                      enum:
+                        - ok
+                        - already stopped
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /alarms:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Get a list of alarms triggered for the user
+      operationId: GetAlarms
+      description: >
+        <p>Get a list of alarms triggered for the user. Alarms can be triggered for readouts, by gateway snapshots and when they are marked missing.</p>
+
+        <ul>
+          <li>FINAL_DATA alarms only show as long as they are in the state EXAMINATION_REQUIRED or ERRONOUS. They disappear once the shipment is marked as COMPLIANT, NON_COMPLIANT or as ERRONEOUS_ACKNOWLEDGED.</li>
+          <li>MISSING alarms only show as long as the shipment is MISSING. They disappear once the shipment is marked as MISSING_ACKNOWLEDGED or data is received.</li>
+          <li>SNAPSHOT_ALARM only show as long as the shipment is IN_TRANSIT. They disappear once the shipment becomes MISSING or data is received.</li>
+        </ul>
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - event_time
+                    - state
+                    - shipment_id
+                    - tracking_id
+                    - send_email
+                    - send_sms
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    state:
+                      type: string
+                      description: the state the shipment is currently in
+                      enum:
+                        - MISSING_DATA
+                        - EXAMINATION_REQUIRED
+                        - ERRONEOUS
+                        - IN_TRANSIT
+                    shipment_id:
+                      type: string
+                      format: uuid
+                    tracking_id:
+                      type: string
+                      example: 984041619600019500
+                    send_email:
+                      type: boolean
+                      description: An email was sent for this notification.
+                    send_sms:
+                      type: boolean
+                      description: A sms was sent for this notification. If sending fails due to a invalid phone number it would show as false. Note that it could still fail due to various other reasons.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /shipments:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Start a shipment
+      operationId: StartShipment
+      description: Save a new shipment. This endpoint should be called once a logger has been started. It sets shipment state to in transit.
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartShipmentRequest"
+            example:
+              tracking_id: 990100000212345700
+              start_timestamp: 2018-06-27T13:24:22.405Z
+              commissioning_time: 2018-06-27T13:24:22.405Z
+              shipment_profile_id: "{{profileId}}"
+              nonce: QN+29sz8YWB6Duuh9Lmjzw==
+              mac_address: d4:09:70:c9:9c:9e
+              firmware_version_major: 1
+              firmware_version_minor: 4
+        required: true
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Stop a shipment
+      operationId: PutShipments
+      description: Stop a shipment. If there is an existing shipment, readout data gets associated with it and shipment is set to a corresponding state based on alarm status. If no shipment with the given nonce exists, a new shipment with all data is saved (for cases when the start / readout device was offline at the time the logger was started)
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PutShipmentsRequest"
+        required: true
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Get shipments
+      operationId: GetShipments
+      description: Get a list of shipments for the authenticated user's company. Allows soting and filtering.
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            example: application/json
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /shipments/csv:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Generate shipment report(s) in csv format
+      operationId: GenerateCSV
+      description: Generate shipment reports for one or more shipments in csv format
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                shipment_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                time_zone:
+                  description: IANA/tz database time zone identifier
+                  type: string
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /shipments/pdf:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Generate shipment report(s) in pdf format
+      operationId: GeneratePDF
+      description: Generater shipment reports for one or more shipments in pdf format
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /shipments/xlsx:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Generate shipment report(s) in xlsx format
+      operationId: GenerateXLSX
+      description: Generater shipment reports for one or more shipments in xlxs format
+      parameters: []
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/shipments/{shipmentId}/comment":
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Add a comment
+      operationId: AddComment
+      description: Add a comment to a shipment. Requires the ADD_COMMENTS permission.
+      parameters:
+        - name: shipmentId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCommentRequest"
+            example:
+              comment: This is fine.
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/shipments/{shipmentId}/compliant":
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Set state to compliant
+      operationId: SetCompliant
+      description: Set shipment status to compliant if its current status is examination required. Requires the HANDLE_SHIPMENTS permission.
+      parameters:
+        - name: shipmentId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetCompliantRequest"
+            example:
+              comment: This is fine.
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/shipments/{shipmentId}/fields":
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Add values for custom fields
+      operationId: AddFields
+      description: Update shipment with the given custom field values.
+      parameters:
+        - name: shipmentId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddFieldsRequest"
+            example:
+              locationID: blöd21
+              gdpVehicle: false
+              date: 2020-03-11
+              dayTemp: 22.5
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/shipments/{shipmentId}/noncompliant":
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Set state to non-compliant
+      operationId: SetNon-Compliant
+      description: Set shipment status to non-compliant if its current status is examination required. Requires the HANDLE_SHIPMENTS permission.
+      parameters:
+        - name: shipmentId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetNon-CompliantRequest"
+            example:
+              comment: This is not fine.
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/shipments/{shipmentId}/acknowledge-missing":
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Acknowledge a missing shipment
+      operationId: AcknowledgeMissing
+      description: Set shipment status to missing data acknowledged if its current status is missing. Requires the HANDLE_SHIPMENTS permission.
+      parameters:
+        - name: shipmentId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcknowledgeMissingRequest"
+            example:
+              comment: This is fine.
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/shipments/{shipmentId}/acknowledge-error":
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Acknowledge an erroneous shipment
+      operationId: AcknowledgeError
+      description: Set shipment status to erroneous acknowledged if its current status is erroneous. Requires the HANDLE_SHIPMENTS permission.
+      parameters:
+        - name: shipmentId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcknowledgeErrorRequest"
+            example:
+              comment: This is fine.
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/shipments/{shipmentId}/events":
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Get shipment change & comments log
+      operationId: GetEvents
+      description: Get events and comments related to the given shipment. These could be system events, such as automatic state changes, user events, such as manual state changes, or gateway events. Sorting is newest first.
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            example: application/json
+        - name: shipmentId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Shipment events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required:
+                    - id
+                    - type
+                    - event_time
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    type:
+                      type: string
+                      enum:
+                        - TRANSIT
+                        - FINAL_DATA
+                        - MANUAL_STATE_TRANSITION
+                        - COMMENT
+                        - MISSING
+                        - SNAPSHOT_ALARM
+                        - SWISSPOST
+                    event_time:
+                      type: string
+                      format: date-time
+                    data:
+                      description: additional data relating to the event. format depends on the type of the event. note that MISSING events have data set to null.
+                      oneOf:
+                        - type: object
+                          description: TRANSIT event data payload
+                          required:
+                            - user_id
+                          properties:
+                            user_id:
+                              type: string
+                              format: uuid
+                              description: the user that started the logger
+                            user_name:
+                              type: string
+                              example: Beth Harmon
+                              description: name of user that might be set if user_id is set
+                            client:
+                              type: string
+                              example: NFC/1.3.0
+                              description: the client used in request when shipment was put in TRANSIT
+                        - type: object
+                          description: INTERMEDIATE_DATA event data payload
+                          required:
+                            - gateway_id
+                            - gateway_name
+                          properties:
+                            gateway_id:
+                              type: string
+                              format: uuid
+                              description: the gateway that sent the intermediate data
+                            gateway_name:
+                              type: string
+                              example: Incoming Goods Gateway Oerlikon
+                              description: name of gateway installation, set if gateway_id is set.
+                            client:
+                              type: string
+                              example: Gateway/3.3.0
+                              description: the client used when sending the final shipment data
+                        - type: object
+                          description: FINAL_DATA event data payload. either user_id or gateway_id is set.
+                          properties:
+                            user_id:
+                              type: string
+                              format: uuid
+                              description: the user that stopped the logger
+                            gateway_id:
+                              type: string
+                              format: uuid
+                              description: the gateway that stopped the logger
+                            user_name:
+                              type: string
+                              example: Wesley So
+                              description: name of user that, might be set if user_id is set.
+                            gateway_name:
+                              type: string
+                              example: Incoming Goods Gateway Oerlikon
+                              description: name of gateway installation, set if gateway_id is set.
+                            shipment_state:
+                              type: string
+                              example: EXAMINATION_REQUIRED
+                              description: the state after readout, COMPLIANT, EXAMINATION_REQUIRED or ERRONEOUS.
+                            client:
+                              type: string
+                              example: Mobile/2.3.0
+                              description: the client used when sending the final shipment data
+                        - type: object
+                          description: MANUAL_STATE_TRANSITION event data payload.
+                          required:
+                            - user_id
+                            - state
+                          properties:
+                            user_id:
+                              type: string
+                              format: uuid
+                              description: the user that changed the state
+                            user_name:
+                              type: string
+                            shipment_state:
+                              type: string
+                              description: the state the shipment was put in by the user
+                              enum:
+                                - COMPLIANT
+                                - NON_COMPLIANT
+                                - MISSING_ACKNOWLEDGED
+                                - ERRONEOUS_ACKNOWLEDGED
+                            comment:
+                              type: string
+                              description: comment made by the user. only set when state is COMPLIANT or NON_COMPLIANT
+                            compliance_reason_id:
+                              type: string
+                              format: uuid
+                              description: the compliance reason selected by the user
+                            compliance_reason_name:
+                              type: string
+                        - type: object
+                          description: COMMENT event data payload.
+                          required:
+                            - user_id
+                            - text
+                          properties:
+                            user_id:
+                              type: string
+                              format: uuid
+                              description: the user that made the comment
+                            comment:
+                              type: string
+                              description: the comment made by the user
+                            user_name:
+                              type: string
+                        - type: object
+                          description: SNAPSHOT_ALARM event data payload.
+                          required:
+                            - gateway_id
+                            - gateway_name
+                          properties:
+                            gateway_id:
+                              type: string
+                              format: uuid
+                              description: the gateway that captured the alarm
+                            gateway_name:
+                              type: string
+                              description: name of gateway installation that captured the alarm
+                        - type: object
+                          description: SWISSPOST event data payload.
+                          required:
+                            - description
+                          properties:
+                            description:
+                              type: string
+                              example: Sorted for delivery 5400 Baden.
+                              description: Text of the event, language is set to the requesting users's language setting.
+                    notifications:
+                      type: array
+                      description: all users that were informed about this shipment event
+                      items:
+                        type: object
+                        required:
+                          - user_id
+                        properties:
+                          user_id:
+                            type: string
+                            format: uuid
+                          user_name:
+                            type: string
+                            example: Hikaru Nakamura
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/shipments/{shipmentId}/gw-sessions":
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Get time intervals where a shipment was close to a gateway.
+      operationId: GetGatewaySessions
+      description: Get all "sessions" (from, to) where a shipment was close to a gateway. A session is a continous time (no gap longer than 15 minutes) where a single gateway installation could "see" the logger/shipment by means of BLE advertisement packages sent via the snapshot endpoint. The response is sorted by the "first" timestamp. Only gateway sessions of shipments in the requester's company are returned, empty array otherwise or if shipment does not exist.
+      parameters:
+        - name: shipmentId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    example: dfbce1bc-007e-4951-926a-fa162754e8dd
+                    description: uniquely identifies a session
+                  gateway_id:
+                    type: string
+                    format: uuid
+                    example: 6e4950fc-5dd5-44f2-a0fb-bca73616ec43
+                    description: the identifier of the gateway installation (not physical hardware)
+                  gateway_name:
+                    type: string
+                    example: "Incoming Goods #4"
+                    description: the name of the gateway installation
+                  first:
+                    type: string
+                    format: date-time
+                    description: first time the gateway has seen this shipment for this session
+                  last:
+                    type: string
+                    format: date-time
+                    description: last time the gateway has seen this shipment for this session
+                  finished:
+                    type: boolean
+                    description: true if the sessions is finished, which is the case if last field is older than 15 minutes
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/shipments/{shipmentId}":
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Get shipment by ID
+      operationId: GetShipmentByID
+      description: Get shipment information. This also includes the shipment profile information with calculated metrics if the shipment has already been read out.
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            example: application/json
+        - name: shipmentId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/logger/{shipmentNonceHex}":
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Shipment
+      summary: Get logger data (temperature data) for shipment
+      operationId: GetLoggerDataByNonce
+      description: Get all data from the logger for the shipment with the given nonce.
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            example: application/json
+        - name: shipmentNonceHex
+          in: path
+          description: The nonce of the shipment as found in the GET /shipment/{shipmentID} response. Must be encoded in hex
+          required: true
+          style: simple
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                properties:
+                  created_at:
+                    example: 2020-09-18T12:23:06.037896Z
+                  updated_at:
+                    example: 2020-09-18T12:23:06.037896Z
+                  deleted_at:
+                    ? example
+                  nonce:
+                    example: rjIMnOV0qSgb0GsGGn4AdQ==
+                  battery_data:
+                    example: VU4KwQvBC+/YFwAWAF5st2IAAAAAAAAAAAAAAACKDaEEAAAA
+                  signature:
+                    example: nepiI2l9q5EAJL9KcQOlUnxprhe0gr4fTDu0+vniRxToBmZi8tFr84zeXNgkWrRQmkNWmS/0oWqZo9RUHfQbTAAAAXShKwDESTR4k95eJ9A4WK/B5dhAammZ/EqoGfs4Rv3TKRWCrgM=
+                  signature_error:
+                    example: false
+                  mac_address:
+                    example: f2:d9:bb:2c:ad:b2
+                  firmware_version_major:
+                    example: 1
+                  firmware_version_minor:
+                    example: 7
+                  temperature_data:
+                    type: string
+                    format: base64
+                    description: All temperatures as int16 in 1/100 degree Celsius concatenated and encoded ase base64.
+                    example: XQp5CncKnwqqBkcFoQQ=
+                  minimum_temperature:
+                    example: 1500
+                  maximum_temperature:
+                    example: 2500
+                  absolute_minimum_temperature:
+                    example: 1500
+                  absolute_maximum_temperature:
+                    example: 2500
+                  deviation_permissible_duration:
+                    example: 0
+                  deviation_reset_time:
+                    example: 0
+                  average_last_n_temperatures:
+                    example: 0
+                  show_alert_on_logger:
+                    example: true
+                  show_alert_on_mobile:
+                    example: true
+                  commissioning_time:
+                    example: 2020-09-18T12:02:42.027Z
+                  expected_shipment_duration:
+                    example: 2419200
+                  recording_delay:
+                    example: 0
+                  recording_interval:
+                    example: 180
+                  tracking_id:
+                    example: "996012844900000095"
+                  sender_id:
+                    example: f1ef10b5-555e-47a7-8499-c45923e42f67
+                  shipment_profile_id:
+                    example: 66a661c8-aa53-4595-b2e1-c2fd38a3d7f3
+                  memory_full:
+                    example: false
+                  battery_low:
+                    example: false
+                  timing_error:
+                    example: false
+                  hardware_error:
+                    example: false
+                  logger_expired:
+                    example: false
+                  alert_occurred:
+                    example: true
+                  start_timestamp:
+                    example: 2020-09-18T12:02:41.884Z
+                  stop_timestamp:
+                    example: 2020-09-18T12:23:04.012Z
+                  first_measurement:
+                    example: 2020-09-18T12:02:46.884Z
+                  last_measurement:
+                    example: 2020-09-18T12:20:46.884Z
+                  reserved_salt:
+                    ? example
+                  temperature_hash:
+                    ? example
+                  comissioning_hash:
+                    ? example
+                  status_flag_hash:
+                    ? example
+                  timestamps_hash:
+                    ? example
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /notifications/email:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Notification
+      summary: Create an email notification setting
+      operationId: CreateEmailNotification
+      description: Add email notification setting for the given user and shipment profile. This will result in the user receiving email notifications whenever an alarm has been triggered for shipments started with the given shipment profile.
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationRequest"
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - Notification
+      summary: Delete an email notification setting
+      operationId: DeleteEmailNotification
+      description: Remove email notification setting for the given user and shipment profile. This will result in the user no longer receiving email notifications whenever an alarm has been triggered for shipments started with the given shipment profile.
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationRequest"
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /notifications/sms:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Notification
+      summary: Create an SMS notification setting
+      operationId: CreateSMSNotification
+      description: Add text message notification setting for the given user and shipment profile. This will result in the user receiving text message notifications whenever an alarm has been triggered for shipments started with the given shipment profile. This notification setting can only be activated for users with phone numbers.
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationRequest"
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    delete:
+      security:
+        - bearerAuth: []
+      tags:
+        - Notification
+      summary: Delete an SMS notification setting
+      operationId: DeleteSMSNotification
+      description: Remove text message notification setting for the given user and shipment profile. This will result in the user no longer receiving text message notifications whenever an alarm has been triggered for shipments started with the given shipment profile.
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationRequest"
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /notifications:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Notification
+      summary: Get notification settings
+      operationId: GetNotifications
+      description: Get the list of all notification settings for all company's users and shipment profiles.
+      parameters: []
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    profile_group_id:
+                      type: string
+                      format: uuid
+                    recipient_id:
+                      type: string
+                      format: uuid
+                    type:
+                      type: string
+                      enum:
+                        - email
+                        - sms
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /version:
+    get:
+      tags:
+        - System
+      summary: Version
+      operationId: Version
+      description: Get the current backend version number.
+      responses:
+        "200":
+          description: Version
+          content:
+            application/json:
+              schema:
+                properties:
+                  version:
+                    type: string
+                    example: 1.0.0
+  /gateway/shipments/status:
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Gateway
+      summary: Get status of shipments
+      operationId: GetGatewayShipmentStatus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required:
+                  - nonce_prefix
+                  - mac_address
+                properties:
+                  nonce_prefix:
+                    type: string
+                  mac_address:
+                    type: string
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    nonce_prefix:
+                      type: string
+                    mac_address:
+                      type: string
+                    next_index:
+                      type: integer
+                    next_timestamp:
+                      type: string
+                      format: date-time
+                    status:
+                      type: string
+                      enum:
+                        - ok
+                        - already stopped
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /gateways:
+    get:
+      tags:
+        - Company Admin
+      summary: Get list of gateway installation in company
+      description: Lists all active gateway installation in the requester's company
+      responses:
+        "200":
+          description: Successful
+          content:
+            application/json:
+              schema:
+                required:
+                  - id
+                  - name
+                  - client_id
+                  - created_at
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  name:
+                    type: string
+                    example: Ramp 4
+                  client_id:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+                  last_seen:
+                    type: string
+                    format: date-time
+                  deleted_at:
+                    type: string
+                    format: date-time
+                  to_stop_description:
+                    type: string
+                    example: All shipments IN_TRANSIT which have been seen by Gateway 'Ramp 5'
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /compliance-reasons:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Compliance Reasons
+      summary: List of company defined compliance reasons
+      responses:
+        "200":
+          description: A list of compliance reasons.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComplianceReason"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Compliance Reasons
+      summary: Add compliance reason
+      requestBody:
+        content:
+          application/json:
+            schema:
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: The newly create compliance reason
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceReason"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  "/compliance-reasons/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        style: simple
+        schema:
+          type: string
+          format: uuid
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Compliance Reasons
+      summary: Get a single compliance reason
+      responses:
+        "200":
+          description: A specific compliance reason
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComplianceReason"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - Compliance Reasons
+      summary: Update a compliance reason
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComplianceReason"
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: reason name already exists
+  /fields:
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - Company Admin
+      summary: List custom fields
+      operationId: ListFields
+      parameters:
+        - name: Content-Type
+          in: header
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+            example: application/json
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - Company Admin
+      summary: Create a custom field
+      operationId: CreateField
+      description: Create a custom field in the company of the authenticated user. This custom field will be then available for all shipments of the company.
+      parameters: []
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateFieldRequest"
+            example:
+              identifier: date
+              type: date
+              german: Touren-Datum
+              english: tour date
+              required: true
+              show_in_temperature_graph: false
+        required: true
+      responses:
+        "200":
+          description: ""
+          headers: {}
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/fields/{fieldId}":
+    put:
+      security:
+        - bearerAuth: []
+      tags:
+        - Company Admin
+      summary: Update a custom field
+      operationId: UpdateField
+      description: Update properties of an existing custom field.
+      parameters:
+        - name: fieldId
+          in: path
+          description: ""
+          required: true
+          style: simple
+          schema:
+            type: string
+      requestBody:
+        description: ""
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateFieldRequest"
+            example:
+              active: false
+              type: text
+              name: Niederlassungsnummer
+              required: false
+              show_in_temperature_graph: false
+        required: true
+      responses:
+        "200":
+          $ref: "#/components/responses/Ok"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+components:
+  schemas:
+    Language:
+      type: string
+      enum:
+        - de
+        - en
+    Permission:
+      type: string
+      enum:
+        - START_LOGGER
+        - READOUT_LOGGER
+        - LIST_SHIPMENTS
+        - LIST_RECEIVED_SHIPMENTS
+        - ADD_COMMENTS
+        - ADMINISTRATE_COMPANY
+        - HANDLE_SHIPMENT
+        - CREATE_SHIPMENT_PROFILES
+        - admin:all
+    State:
+      type: string
+      enum:
+        - IN_TRANSIT
+        - EXAMINATION_REQUIRED
+        - COMPLIANT
+        - NON_COMPLIANT
+        - ERRONEOUS
+        - ERRONEOUS_ACKNOWLEDGED
+        - MISSING_DATA
+        - MISSING_DATA_ACKNOWLEDGED
+    ActivateAccountRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - activation_token
+        - password
+        - first_name
+        - last_name
+        - language
+      properties:
+        activation_token:
+          type: string
+          format: uuid
+        password:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        language:
+          $ref: "#/components/schemas/Language"
+        phone:
+          type: string
+        eula_version:
+          type: string
+      example:
+        activation_token: 7958df46-4a51-4807-ba3f-668c87dc4467
+        password: asdf2
+        first_name: Max
+        last_name: Muster
+        language: en
+        phone: "+14167171151"
+        eula_version: "1.0"
+    InitializeResetRequest:
+      type: object
+      additionalProperties: false
+      title: InitializeResetRequest
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+      example:
+        email: max.muster@example.com
+    ResetPasswordRequest:
+      title: ResetPasswordRequest
+      required:
+        - reset_token
+        - password
+      type: object
+      properties:
+        reset_token:
+          type: string
+          format: uuid
+        password:
+          type: string
+          format: password
+      example:
+        reset_token: bab07136-f4cb-4e6c-96f2-355793c696ae
+        password: asdf2
+    ChangePasswordRequest:
+      title: ResetPasswordRequest
+      required:
+        - reset_token
+        - password
+      type: object
+      properties:
+        current_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          format: password
+      example:
+        current_password: asdf2
+        new_password: Asdf2.xx
+    InviteUserRequest:
+      title: InviteUserRequest
+      required:
+        - email
+        - role_id
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+        role_id:
+          type: string
+          format: uuid
+      example:
+        email: new.user@example.com
+        first_name: New
+        last_name: User
+        role_id: "{{roleId}}"
+    UpdateownUserRequest:
+      title: UpdateownUserRequest
+      required:
+        - language
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        phone:
+          type: string
+        language:
+          $ref: "#/components/schemas/Language"
+      example:
+        first_name: New
+        last_name: Lastname
+        language: en
+    ChangeRoleOfUserRequest:
+      title: ChangeRoleOfUserRequest
+      required:
+        - role_id
+      type: object
+      properties:
+        role_id:
+          type: string
+      example:
+        role_id: "{{roleId}}"
+    StartShipmentRequest:
+      title: StartShipmentRequest
+      required:
+        - tracking_id
+        - start_timestamp
+        - commissioning_time
+        - shipment_profile_id
+        - nonce
+        - mac_address
+        - firmware_version_major
+        - firmware_version_minor
+      type: object
+      properties:
+        tracking_id:
+          type: string
+        start_timestamp:
+          type: string
+        commissioning_time:
+          type: string
+        shipment_profile_id:
+          type: string
+        nonce:
+          type: string
+        mac_address:
+          type: string
+        firmware_version_major:
+          type: integer
+          format: int32
+        firmware_version_minor:
+          type: integer
+          format: int32
+      example:
+        tracking_id: 990100000212345700
+        start_timestamp: 2018-06-27T13:24:22.405Z
+        commissioning_time: 2018-06-27T13:24:22.405Z
+        shipment_profile_id: "{{profileId}}"
+        nonce: QN+29sz8YWB6Duuh9Lmjzw==
+        mac_address: d4:09:70:c9:9c:9e
+        firmware_version_major: 1
+        firmware_version_minor: 4
+    AddCommentRequest:
+      title: AddCommentRequest
+      required:
+        - comment
+      type: object
+      properties:
+        comment:
+          type: string
+      example:
+        comment: This is fine.
+    SetCompliantRequest:
+      title: SetCompliantRequest
+      required:
+        - comment
+      type: object
+      properties:
+        comment:
+          type: string
+      example:
+        comment: This is fine.
+    AddFieldsRequest:
+      title: AddFieldsRequest
+      required:
+        - locationID
+        - gdpVehicle
+        - date
+        - dayTemp
+      type: object
+      properties:
+        locationID:
+          type: string
+        gdpVehicle:
+          type: boolean
+        date:
+          type: string
+        dayTemp:
+          type: number
+      example:
+        locationID: blöd21
+        gdpVehicle: false
+        date: 2020-03-11
+        dayTemp: 22.5
+    SetNon-CompliantRequest:
+      title: SetNon-CompliantRequest
+      required:
+        - comment
+      type: object
+      properties:
+        comment:
+          type: string
+      example:
+        comment: This is not fine.
+    AcknowledgeMissingRequest:
+      title: AcknowledgeMissingRequest
+      required:
+        - comment
+      type: object
+      properties:
+        comment:
+          type: string
+      example:
+        comment: This is fine.
+    AcknowledgeErrorRequest:
+      title: AcknowledgeErrorRequest
+      required:
+        - comment
+      type: object
+      properties:
+        comment:
+          type: string
+      example:
+        comment: This is fine.
+    PutShipmentsRequest:
+      title: PutShipmentsRequest
+      required:
+        - tracking_id
+        - start_timestamp
+        - stop_timestamp
+        - first_measurement
+        - last_measurement
+        - commissioning_time
+        - shipment_profile_id
+        - sender_id
+        - nonce
+        - mac_address
+        - firmware_version_major
+        - firmware_version_minor
+        - signature
+        - memory_full
+        - battery_low
+        - timing_error
+        - hardware_error
+        - logger_expired
+        - alert_occurred
+        - temperature_data
+        - battery_data
+      type: object
+      properties:
+        tracking_id:
+          type: string
+          example: 996005625100161400
+        start_timestamp:
+          type: string
+          format: date-time
+        stop_timestamp:
+          type: string
+          format: date-time
+        first_measurement:
+          type: string
+          format: date-time
+        last_measurement:
+          type: string
+          format: date-time
+        commissioning_time:
+          type: string
+          format: date-time
+        shipment_profile_id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        nonce:
+          type: string
+          format: base64
+          example: QN+29sz8YWB6Duuh9Lmjzw==
+        mac_address:
+          type: string
+          example: cc:bb:00:11:22:88
+        firmware_version_major:
+          type: integer
+          format: int32
+          example: 1
+        firmware_version_minor:
+          type: integer
+          format: int32
+          example: 8
+        signature:
+          type: string
+          format: base64
+          example: 1zVQHYBYdDRlzhbO8EJaQeVXKF5Wm3UG2eWqgtlxWzNza4AXnSLYFmgQQC7+j1XxYOtHBfzeH6IJu2Hn8VWxV3OXUgTYy1t61dRjqSxBXlcOrQTmxMh4HEDnHWipVnDY/oHhOwGS6T0=
+        memory_full:
+          type: boolean
+        battery_low:
+          type: boolean
+        timing_error:
+          type: boolean
+        hardware_error:
+          type: boolean
+        logger_expired:
+          type: boolean
+        alert_occurred:
+          type: boolean
+        temperature_data:
+          type: string
+          format: base64
+          example: xQnJCQ==
+          description: base64 encoded temperatures in 1/100 degree C encoded as signed int16 little endian
+        battery_data:
+          type: string
+          format: base64
+          example: SAwC0grSCuAUAAAcAIDC6CkAAAAAAAAAAAAAAAAyDB4IAAAA
+    NotificationRequest:
+      title: NotificationRequest
+      required:
+        - recipient_id
+        - profile_group_id
+      type: object
+      properties:
+        recipient_id:
+          type: string
+          format: uuid
+        profile_group_id:
+          type: string
+          format: uuid
+    ReadoutRequest:
+      title: ReadoutRequest
+      required:
+        - alert_occurred
+        - battery_data
+        - battery_low
+        - commissioning_time
+        - firmware_version_major
+        - firmware_version_minor
+        - first_measurement
+        - hardware_error
+        - last_measurement
+        - logger_expired
+        - mac_address
+        - memory_full
+        - nonce
+        - sender_id
+        - shipment_profile_id
+        - signature
+        - start_timestamp
+        - stop_timestamp
+        - temperature_data
+        - timing_error
+        - tracking_id
+      type: object
+      properties:
+        alert_occurred:
+          type: boolean
+        battery_data:
+          type: string
+        battery_low:
+          type: boolean
+        commissioning_time:
+          type: string
+        firmware_version_major:
+          type: integer
+          format: int32
+        firmware_version_minor:
+          type: integer
+          format: int32
+        first_measurement:
+          type: string
+        hardware_error:
+          type: boolean
+        last_measurement:
+          type: string
+        logger_expired:
+          type: boolean
+        mac_address:
+          type: string
+        memory_full:
+          type: boolean
+        nonce:
+          type: string
+        sender_id:
+          type: string
+        shipment_profile_id:
+          type: string
+        signature:
+          type: string
+        start_timestamp:
+          type: string
+        stop_timestamp:
+          type: string
+        temperature_data:
+          type: string
+        timing_error:
+          type: boolean
+        tracking_id:
+          type: string
+      example:
+        alert_occurred: false
+        battery_data: VmwCdwt3C7ESAAAOACDwYRUAAAAAAAAAAAAAAAAxCzAIAAAA
+        battery_low: false
+        commissioning_time: 2020-02-20T09:15:43.21Z
+        firmware_version_major: 1
+        firmware_version_minor: 6
+        first_measurement: 2020-02-20T09:16:52.483Z
+        hardware_error: false
+        last_measurement: 2020-02-20T09:16:52.483Z
+        logger_expired: false
+        mac_address: E9:BC:9E:21:87:AA
+        memory_full: false
+        nonce: b8Qe/aP6WJSXqKNfcLAXAQ==
+        sender_id: 5efd612d-14a9-4e46-acbd-b8cec2b4ef13
+        shipment_profile_id: af647793-0e51-4d2a-8c99-199f5c42fc80
+        signature: vIuW+4raOG/5Jc6Kvd4v02CwKTLYwLolkfsRj1gmgaG5PKopbNj6MZC/6oqcVOEUU4gcruL2dXgca45xpAyT7AAAAXBh46SPfY3S4hkuX5zUM4AqU/1nR2mZ/EqoGfs4Rv3TKRWCrgM=
+        start_timestamp: 2020-02-20T09:16:47.483Z
+        stop_timestamp: 2020-02-20T09:17:53.514Z
+        temperature_data: Qwk=
+        timing_error: false
+        tracking_id: fuckup
+    GatewayInstallation:
+      title: GatewayInstallation
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Truck Ramp Gateway
+        client_id:
+          type: string
+          example: SIL17zGlEZZiCPKK36KsR6oQ0AESOanR
+        created_at:
+          type: string
+          format: date-time
+        deleted_at:
+          type: string
+          format: date-time
+          example: null
+        last_seen:
+          type: string
+          format: date-time
+        company_id:
+          type: string
+          format: uuid
+        company_name:
+          type: string
+          example: Modum
+        heartbeat_data:
+          type: object
+          example: null
+    CreateFieldRequest:
+      title: CreateFieldRequest
+      required:
+        - identifier
+        - type
+        - name
+        - required
+        - show_in_temperature_graph
+      type: object
+      properties:
+        identifier:
+          type: string
+        type:
+          type: string
+        name:
+          type: string
+        required:
+          type: boolean
+        show_in_temperature_graph:
+          type: boolean
+      example:
+        identifier: date
+        type: date
+        name: Touren-Datum
+        required: true
+        show_in_temperature_graph: false
+    UpdateFieldRequest:
+      title: UpdateFieldRequest
+      required:
+        - active
+        - type
+        - name
+        - required
+        - show_in_temperature_graph
+      type: object
+      properties:
+        active:
+          type: boolean
+        type:
+          type: string
+        name:
+          type: string
+        required:
+          type: boolean
+        show_in_temperature_graph:
+          type: boolean
+      example:
+        active: false
+        type: text
+        name: Niederlassungsnummer
+        required: false
+        show_in_temperature_graph: false
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+          example: null
+        first_name:
+          type: string
+          nullable: true
+        last_name:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          nullable: true
+        company_id:
+          type: string
+          format: uuid
+          readOnly: true
+        role_id:
+          type: string
+          format: uuid
+        role_name:
+          type: string
+          readOnly: true
+        language:
+          $ref: "#/components/schemas/Language"
+          nullable: true
+        is_activated:
+          format: boolean
+          readOnly: true
+    Auth:
+      type: object
+      required:
+        - user
+        - token
+        - refreshToken
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+          format: jwt
+        refreshToken:
+          type: string
+          format: jwt
+    Role:
+      type: object
+      required:
+        - name
+        - permissions
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Permission"
+          readOnly: true
+    Profile:
+      type: object
+      required:
+        - name
+        - minimum_temperature
+        - maximum_temperature
+        - recording_interval
+        - expected_shipment_duration
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        deleted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+          readOnly: true
+        company_id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        recording_interval:
+          type: integer
+          format: uint32
+        recording_delay:
+          type: integer
+          format: uint64
+          default: 0
+        expected_shipment_duration:
+          type: integer
+          format: uint64
+        minimum_temperature:
+          type: integer
+          format: int16
+        maximum_temperature:
+          type: integer
+          format: int16
+        absolute_minimum_temperature:
+          type: integer
+          format: int16
+        absolute_maximum_temperature:
+          type: integer
+          format: int16
+        deviation_permissible_duration:
+          type: integer
+          format: uint64
+          default: 0
+        deviation_reset_time:
+          type: integer
+          format: uint64
+          default: 0
+        average_last_n_temperatures:
+          type: integer
+          format: uint8
+          default: 0
+        show_alert_on_logger:
+          type: boolean
+          default: true
+        show_alert_on_mobile:
+          type: boolean
+          default: true
+        version:
+          type: integer
+          minimum: 1
+          readOnly: true
+        group_id:
+          type: string
+          format: uuid
+    ComplianceReason:
+      type: object
+      required:
+        - name
+        - active
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+        name:
+          type: string
+        active:
+          type: boolean
+    Error:
+      type: object
+      required:
+        - status
+        - message
+      properties:
+        status:
+          type: number
+        message:
+          type: string
+        error:
+          type: string
+  responses:
+    Ok:
+      description: Successful
+      content:
+        application/json:
+          schema:
+            properties:
+              status:
+                type: number
+              message:
+                type: string
+            example:
+              status: 200
+              message: OK
+    NotFound:
+      description: The specified resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            status: 401
+            message: Unauthorized
+    MissingPermission:
+      description: Missing permission
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            status: 403
+            message: Forbidden
+            error: missing permission
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+tags:
+  - name: Account
+  - name: User
+  - name: Role
+  - name: Shipment
+  - name: Notification
+  - name: System
+  - name: Gateway
+  - name: Company Admin
